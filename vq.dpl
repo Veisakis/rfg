@@ -1,0 +1,90 @@
+! Initialize Variables
+int i; 
+
+double vset;
+double pmax_all, pmax_indv;
+double qmax_indv, qmin_indv;
+double PCC_V_START, PCC_Q_START; 
+
+set gen_all;
+object gen_indv;
+
+! Clear All
+ClearOutput();
+RESULTS.Clear(); 
+RESULTS.AddVars(this, 'b:RFG_V', 'b:RFG_Q', 'b:PCC_V', 'b:PCC_Q');
+
+!Select Generators
+!Calculate Powers
+gen_all = SEL.All();
+gen_indv = gen_all.First();
+
+pmax_indv = gen_indv:Pmax_uc;
+qmax_indv = gen_indv:sgn;
+qmin_indv = qmax_indv * -1;
+
+if (IS_PV = 1){
+  pmax_all = pmax_indv * N_GEN * gen_indv:ngnum / 1000;
+}
+else{
+  pmax_all = pmax_indv * N_GEN;
+}
+
+!Set P=Pmax on all Generators
+!Set Q=Qmax on all Generators
+for (i=1; i<=N_GEN; i+=1){    
+  gen_indv.SetVal(pmax_indv,'pgini',0);
+  gen_indv.SetVal(qmax_indv,'qgini',0);
+  gen_indv = gen_all.Next();
+}
+gen_indv = gen_all.First();
+
+!Calculate in steps of 0.01 p.u., V-Q at PCC
+for (vset=0.9; vset<=1.1; vset+=0.01){
+
+  GRID.SetVal(vset,'usetp',0);
+  LOADFLOW.Execute();
+  
+  if (vset=0.9){
+    PCC_V_START = PCC:m:u;
+    PCC_Q_START = PCC:m:Qout / pmax_all;
+    RFG_V = RFG_V_VECTOR.Get(1); 
+    RFG_Q = RFG_Q_VECTOR.Get(1);
+  }
+  
+  PCC_V = PCC:m:u;
+  PCC_Q = PCC:m:Qout / pmax_all;
+  RESULTS.Write();
+}
+
+!Set P=Pmax on all Generators
+!Set Q=Qmin on all Generators
+for (i=1; i<=N_GEN; i+=1){    
+  gen_indv.SetVal(pmax_indv,'pgini',0);
+  gen_indv.SetVal(qmin_indv,'qgini',0);
+  gen_indv = gen_all.Next();
+}
+gen_indv = gen_all.First();
+
+!Calculate in steps of 0.01 p.u., V-Q at PCC
+for (vset=1.1; vset>=0.9; vset-=0.01){
+
+  GRID.SetVal(vset,'usetp',0);
+  LOADFLOW.Execute();
+
+  PCC_V = PCC:m:u;
+  PCC_Q = PCC:m:Qout / pmax_all;
+  RESULTS.Write();
+}
+
+!Close the loop
+PCC_V = PCC_V_START;
+PCC_Q = PCC_Q_START;
+RESULTS.Write();
+
+!Fetch RfG Curve
+for (i=2; i<=7; i+=1){
+  RFG_V = RFG_V_VECTOR.Get(i);
+  RFG_Q = RFG_Q_VECTOR.Get(i);
+  RESULTS.Write(); 
+}
