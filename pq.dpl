@@ -1,21 +1,24 @@
 !Initialize Variables
 int i;
-double pmax_all, pmax_indv, pset, qmax_indv, qmin_indv;
+
+double pset;
+double pmax_all, pmax_indv;
+double qmax_indv, qmin_indv;
 double PCC_P_START, PCC_Q_START;
+
 set gen_all;
 object gen_indv;
 
-!Clear before Execute
+!Clear All
 ClearOutput();
 RESULTS.Clear(); 
 RESULTS.AddVars(this, 'b:RFG_P', 'b:RFG_Q', 'b:PCC_P', 'b:PCC_Q');
 
-!Select all Generators
+!Select Generators
+!Calculate Powers
 gen_all = SEL.All();
 gen_indv = gen_all.First();
 
-!Calculate maximum Active Power 
-!of individual Generator and in total
 pmax_indv = gen_indv:Pmax_uc;
 qmax_indv = gen_indv:sgn;
 qmin_indv = qmax_indv * -1;
@@ -27,14 +30,14 @@ else{
   pmax_all = pmax_indv * N_GEN;
 }
 
-!Initialize Reactive Power for the positive side
+!Set Q=Qmax on all Generators
 for (i=1; i<=N_GEN; i+=1){    
     gen_indv.SetVal(qmax_indv,'qgini',0);
     gen_indv = gen_all.Next();
   }
 gen_indv = gen_all.First();
 
-!Calculate in steps of 0.05 p.u., P-Q in HV side
+!Calculate in steps of 0.05 p.u., P-Q at PCC
 for (pset=0; pset<=1; pset+=0.05){
   for (i=1; i<=N_GEN; i+=1){    
     gen_indv.SetVal(pset*pmax_indv,'pgini',0);
@@ -43,24 +46,26 @@ for (pset=0; pset<=1; pset+=0.05){
   gen_indv = gen_all.First();
   
   LOADFLOW.Execute();
-
+  
   if (pset=0){
     PCC_P_START = PCC:m:Pout / pmax_all;
     PCC_Q_START = PCC:m:Qout / pmax_all;
+    RFG_P = RFG_P_VECTOR.Get(1);
+    RFG_Q = RFG_Q_VECTOR.Get(1);
   }
   PCC_P = PCC:m:Pout / pmax_all;
   PCC_Q = PCC:m:Qout / pmax_all;
   RESULTS.Write();
 }
 
-!Initialize Reactive Power for the negative side
+!Set Q=Qmin on all Generators
 for (i=1; i<=N_GEN; i+=1){    
     gen_indv.SetVal(qmin_indv,'qgini',0);
     gen_indv = gen_all.Next();
   }
 gen_indv = gen_all.First();
 
-!Calculate in steps of 0.05 p.u., P-Q in HV side
+!Calculate in steps of 0.05 p.u., P-Q at PCC
 for (pset=1; pset>=0; pset-=0.05){
   for (i=1; i<=N_GEN; i+=1){    
     gen_indv.SetVal(pset*pmax_indv,'pgini',0);
@@ -81,7 +86,7 @@ PCC_Q = PCC_Q_START;
 RESULTS.Write();
 
 !Fetch RfG Curve
-for (i=1; i<=6; i+=1){
+for (i=2; i<=6; i+=1){
   RFG_P = RFG_P_VECTOR.Get(i);
   RFG_Q = RFG_Q_VECTOR.Get(i);
   RESULTS.Write(); 
